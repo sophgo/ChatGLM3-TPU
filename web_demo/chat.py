@@ -23,21 +23,21 @@ class TPUChatglm:
         self.init()
 
     def libset(self):
-        self.lib.ChatGLM2_with_devid_and_model.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p]
-        self.lib.ChatGLM2_with_devid_and_model.restype = ctypes.c_void_p
+        self.lib.ChatGLM_with_devid_and_model.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p]
+        self.lib.ChatGLM_with_devid_and_model.restype = ctypes.c_void_p
 
-        self.lib.ChatGLM2_delete.argtypes = [ctypes.c_void_p]
+        self.lib.ChatGLM_delete.argtypes = [ctypes.c_void_p]
 
         # deinit
-        self.lib.ChatGLM2_deinit.argtypes = [ctypes.c_void_p]
+        self.lib.ChatGLM_deinit.argtypes = [ctypes.c_void_p]
 
-        # ChatGLM2_predict_first_token
-        self.lib.ChatGLM2_predict_first_token.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-        self.lib.ChatGLM2_predict_first_token.restype = ctypes.c_char_p
+        # ChatGLM_predict_first_token
+        self.lib.ChatGLM_predict_first_token.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        self.lib.ChatGLM_predict_first_token.restype = ctypes.c_char_p
 
-        # ChatGLM2_predict_next_token
-        self.lib.ChatGLM2_predict_next_token.argtypes = [ctypes.c_void_p]
-        self.lib.ChatGLM2_predict_next_token.restype = ctypes.c_char_p
+        # ChatGLM_predict_next_token
+        self.lib.ChatGLM_predict_next_token.argtypes = [ctypes.c_void_p]
+        self.lib.ChatGLM_predict_next_token.restype = ctypes.c_char_p
 
         # get_eos
         self.lib.get_eos.argtypes = [ctypes.c_void_p]
@@ -49,14 +49,14 @@ class TPUChatglm:
         self.lib.set_history.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
     def init(self):
-        self.obj = self.lib.ChatGLM2_with_devid_and_model(self.device_id, self.bmodel_path.encode('utf-8'),
+        self.obj = self.lib.ChatGLM_with_devid_and_model(self.device_id, self.bmodel_path.encode('utf-8'),
                                                           self.token_path.encode('utf-8'))
 
     def predict_first_token(self, context):
-        return self.lib.ChatGLM2_predict_first_token(self.obj, context.encode('utf-8')).decode('utf-8')
+        return self.lib.ChatGLM_predict_first_token(self.obj, context.encode('utf-8')).decode('utf-8')
 
     def predict_next_token(self):
-        return self.lib.ChatGLM2_predict_next_token(self.obj).decode('utf-8')
+        return self.lib.ChatGLM_predict_next_token(self.obj).decode('utf-8')
 
     def predict(self, context):
 

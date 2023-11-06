@@ -540,15 +540,15 @@ std::string ChatGLM::answer(const std::string &input_str) {
 extern "C" {
 
 
-ChatGLM *ChatGLM2_with_devid_and_model(int devid, const char *bmodel_path, const char *tokenizer_path) {
+ChatGLM *ChatGLM_with_devid_and_model(int devid, const char *bmodel_path, const char *tokenizer_path) {
   ChatGLM *chat = new ChatGLM();
   chat->init(devid, bmodel_path, tokenizer_path);
   return chat;
 }
 
-void ChatGLM2_delete(ChatGLM *chat) { delete chat; }
+void ChatGLM_delete(ChatGLM *chat) { delete chat; }
 
-void ChatGLM2_deinit(ChatGLM *chat) {
+void ChatGLM_deinit(ChatGLM *chat) {
   chat->deinit();
 }
 
@@ -562,12 +562,12 @@ const char *set_history(ChatGLM *chat, const char *history) {
   return strdup(history);
 }
 
-const char *ChatGLM2_predict_first_token(ChatGLM *chat, const char *input_str) {
+const char *ChatGLM_predict_first_token(ChatGLM *chat, const char *input_str) {
   std::string str = chat->predict_first_token(input_str);
   return strdup(str.c_str());
 }
 
-const char *ChatGLM2_predict_next_token(ChatGLM *chat) {
+const char *ChatGLM_predict_next_token(ChatGLM *chat) {
   std::string str = chat->predict_next_token();
   return strdup(str.c_str());
 }
@@ -585,12 +585,12 @@ int main(int argc, char **argv) {
   }
   const char* bmodel_path = argv[1];
   const char* tokenizer_path = argv[2];
-  ChatGLM *chat = ChatGLM2_with_devid_and_model(0, bmodel_path, tokenizer_path);
+  ChatGLM *chat = ChatGLM_with_devid_and_model(0, bmodel_path, tokenizer_path);
   const char *inputstr = "请用python写排序";
-  const char *outputstr = ChatGLM2_predict_first_token(chat, inputstr);
+  const char *outputstr = ChatGLM_predict_first_token(chat, inputstr);
   std::cout << outputstr << std::flush;
   for (int i = 0; i < 10; i++) {
-    outputstr = ChatGLM2_predict_next_token(chat);
+    outputstr = ChatGLM_predict_next_token(chat);
     std::cout << outputstr << std::flush;
   }
   return 0;

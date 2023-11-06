@@ -1,14 +1,24 @@
 cmake_minimum_required(VERSION 2.8)
 project(chatglm)
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 
-set(LIBSOPHON /opt/sophon/libsophon-current)
-include_directories(${LIBSOPHON}/include)
+if (NOT DEFINED TARGET_ARCH)
+    set(TARGET_ARCH pcie)
+endif()
+
 include_directories(${PROJECT_SOURCE_DIR}/include)
-link_directories(${LIBSOPHON}/lib)
-link_directories(${PROJECT_SOURCE_DIR}/lib)
+
+message("${TARGET_ARCH} mode, starting......")
+
+if (${TARGET_ARCH} STREQUAL "pcie")
+    add_definitions(-DPCIE_TARGET)
+    link_directories(${PROJECT_SOURCE_DIR}/lib_pcie)
+elseif (${TARGET_ARCH} STREQUAL "soc")
+    add_definitions(-DSOC_TARGET)
+    set(CMAKE_C_COMPILER /opt/aarch64-linux-gnu-7.5.0/bin/aarch64-linux-gnu-gcc)
+    set(CMAKE_ASM_COMPILER /opt/aarch64-linux-gnu-7.5.0/bin/aarch64-linux-gnu-gcc)
+    set(CMAKE_CXX_COMPILER /opt/aarch64-linux-gnu-7.5.0/bin/aarch64-linux-gnu-g++)
+    link_directories(${PROJECT_SOURCE_DIR}/lib_soc)
+endif()
 
 add_definitions(-DDEBUG --std=c++17 -fPIC -Wall -Werror)
 set(CMAKE_BUILD_TYPE "Debug")

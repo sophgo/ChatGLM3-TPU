@@ -4,7 +4,6 @@
 
 本项目实现BM1684X部署语言大模型[ChatGLM3-6B](https://huggingface.co/THUDM/chatglm3-6b)。通过[TPU-MLIR](https://github.com/sophgo/tpu-mlir)编译器将模型转换成bmodel，并采用c++代码将其部署到BM1684X的PCIE环境，或者SoC环境。
 
-下文中默认是PCIE环境；如果是SoC环境，按提示操作即可。
 
 在知乎上写了关于`ChatGLM`的解读，方便大家理解源码：
 
@@ -24,12 +23,6 @@ docker run --privileged --name myname1234 -v $PWD:/workspace -it sophgo/tpuc_dev
 ```
 后文假定环境都在docker的`/workspace`目录。
 
-如果是要在SoC环境运行，则需要安装如下库：
-
-``` shell
-apt-get update
-apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-```
 
 2. 下载`ChatGLM3-6B`，比较大，会花较长时间
 
@@ -106,7 +99,7 @@ python3 export_onnx.py
 
 3. 对onnx模型进行编译
 
-目前TPU-MLIR支持对ChatGLM2进行F16, INT8和INT4量化，且支持多芯分布式推理，默认情况下会进行F16量化和单芯推理，最终生成`chatglm3-6b.bmodel`文件
+目前TPU-MLIR支持对ChatGLM3进行F16、INT8和INT4量化，且支持多芯分布式推理，默认情况下会进行F16量化和单芯推理，最终生成`chatglm3-6b.bmodel`文件
 
 ```shell
 ./compile.sh
@@ -126,9 +119,7 @@ python3 export_onnx.py
 
 ## 编译程序(C++版本)
 
-将demo目录拷贝到PCIE或者SoC环境，注意环境中必须有libsophon库。
-如果是SoC环境，将lib目录的`libsentencepiece.a.soc`改名`libsentencepiece.a`。
-执行如下编译：
+执行如下编译，默认是PCIE版本：
 
 ```shell
 cd ChatGLM3-TPU/demo
@@ -136,6 +127,24 @@ mkdir build
 cd build
 cmake ..
 make -j
+```
+
+如果是SoC版本，有两种编译方法：
+
+方法1：直接将demo目录拷贝到SoC环境，按以上步骤编译
+
+方法2：docker中交叉编译，如下操作
+
+```shell
+wget https://releases.linaro.org/components/toolchain/binaries/7.5-2019.12/aarch64-linux-gnu/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu.tar.xz
+tar -xvf gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu.tar.xz
+mv gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu /opt/aarch64-linux-gnu-7.5.0
+cd ChatGLM3-TPU/demo
+mkdir build
+cd build
+cmake .. -DTARGET_ARCH=soc
+make -j
+
 ```
 
 编译生成chatglm可执行程序，将`chatglm`、`chatglm3-6b.bmodel`和`tokenizer.model`拷贝到同一个目录下就可以执行了。
@@ -220,27 +229,9 @@ cmake ..
 make -j
 ```
 
-如果要编译SoC环境，则需要在`CMakeLists.txt`加入如下代码：
+如果要编译SoC环境，则参考demo的编译方式，在makefile中指定交叉编译器
 
-```cmake
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-```
+#### demo程序无法正常运行
 
-#### libsophgo库怎么获取
-
-这一步有PCIE环境或者SOC环境的情况下，可以省略。
-
-在算能官网<https://developer.sophgo.com/site/index/material/all/all.html>可以找到SDK最新版本，如下：
-
-```shell
-wget https://sophon-file.sophon.cn/sophon-prod-s3/drive/23/10/24/21/Release_v2309-LTS.zip
-```
-解压sdk后安装libsophon，如下：
-
-```shell
-apt install sophon-libsophon-dev_0.4.9_amd64.deb
-```
-
-注意如果是SoC环境则安装arm64版本`sophon-libsophon-dev_0.4.9_arm64.deb`
+如果demo程序拷贝到运行环境提示无法运行，比如接口找不到等等错误。
+原因是运行环境的库有所不同，将demo中的`lib_pcie`（PCIE）或者 `lib_soc`(SoC)里面的so文件拷贝到运行环境，链接到里面的so即可。
