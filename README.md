@@ -6,9 +6,9 @@
 
 下文中默认是PCIE环境；如果是SoC环境，按提示操作即可。
 
-在知乎上写了关于`ChatGLM3-6B`的解读，方便大家理解源码：
+在知乎上写了关于`ChatGLM`的解读，方便大家理解源码：
 
-[ChatGLM3-6B流程解析与TPU-MLIR部署](https://zhuanlan.zhihu.com/p/641975976)
+[ChatGLM2流程解析与TPU-MLIR部署](https://zhuanlan.zhihu.com/p/641975976)
 
 
 ## 开发环境
@@ -36,6 +36,7 @@ apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 git lfs install
 git clone git@hf.co:THUDM/chatglm3-6b
 ```
+
 并对该工程做三点修改：
 - 将`config.json`文件中`seq_length`配置为512；
 
@@ -68,6 +69,8 @@ if pytorch_major_version >= 2:
 pytorch_major_version = int(torch.__version__.split('.')[0])
 if False:
 ```
+
+这是因为ONNX无法支持`torch.nn.functional.scaled_dot_product_attention`算子的转换。
 
 3. 下载`TPU-MLIR`代码并编译，(也可以直接下载编译好的release包解压)
 
@@ -102,15 +105,15 @@ set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 在算能官网<https://developer.sophgo.com/site/index/material/all/all.html>可以找到SDK最新版本，如下：
 
 ```shell
-wget https://sophon-file.sophon.cn/sophon-prod-s3/drive/23/06/15/16/Release_230501-public.zip
+wget https://sophon-file.sophon.cn/sophon-prod-s3/drive/23/10/24/21/Release_v2309-LTS.zip
 ```
 解压sdk后安装libsophon，如下：
 
 ```shell
-apt install sophon-libsophon-dev_0.4.8_amd64.deb
+apt install sophon-libsophon-dev_0.4.9_amd64.deb
 ```
 
-注意如果是SoC环境则安装arm64版本`sophon-libsophon-dev_0.4.8_arm64.deb`
+注意如果是SoC环境则安装arm64版本`sophon-libsophon-dev_0.4.9_arm64.deb`
 
 6. 下载本项目`ChatGLM3-TPU`，如下：
 
@@ -129,7 +132,7 @@ export PYTHONPATH=/workspace/chatglm3-6b:$PYTHONPATH
 2. 导出所有onnx模型，如果过程中提示缺少某些组件，直接`pip install 组件`即可
 
 ``` shell
-cd chatglm3-tpu/compile
+cd ChatGLM3-TPU/compile
 python3 export_onnx.py
 ```
 此时有大量onnx模型被导出到tmp目录。
@@ -142,13 +145,13 @@ python3 export_onnx.py
 ./compile.sh
 ```
 
-若想进行INT8或INT4量化，则执行以下命令，最终生成`chatglm3-6b_int8.bmodel`或`chatglm3-6b_int4.bmodel`文件
+若想进行INT8或INT4量化，则执行以下命令，最终生成`chatglm3-6b_int8.bmodel`或`chatglm3-6b_int4.bmodel`文件，如下命令：
 
 ```shell
 ./compile.sh --mode int8 # or int4
 ```
 
-若想进行2芯推理，则执行以下命令，最终生成`chatglm3-6b_f16_2dev.bmodel`文件
+若想进行2芯推理，则执行以下命令，最终生成`chatglm3-6b_f16_2dev.bmodel`文件，4芯8芯同理：
 
 ```shell
 ./compile.sh --num_device 2
@@ -157,7 +160,7 @@ python3 export_onnx.py
 ## 编译程序(C++版本)
 
 ```shell
-cd chatglm3-tpu/demo
+cd ChatGLM3-TPU/demo
 mkdir build
 cd build
 cmake ..
@@ -172,28 +175,28 @@ set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
 set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 ```
 
-编译生成chatglm2可执行程序，将`chatglm3`、`chatglm3-6b?.bmodel`和`tokenizer.model`拷贝到运行环境就可以执行了。
+编译生成chatglm可执行程序，将`chatglm`、`chatglm3-6b.bmodel`和`tokenizer.model`拷贝到运行环境就可以执行了。
 (`tokenizer.model`来自`ChatGLM3-6B`)。
 
-运行`chatglm3`，默认单芯运行`chatglm3-6b.bmodel`:
+运行`chatglm`，默认单芯运行`chatglm3-6b.bmodel`:
 ```shell
-./chatglm3
+./chatglm --model chatglm3-6b.bmodel
 ```
 
 如果是要运行INT8或INT4模型，则命令如下：
 ```shell
-./chatglm3 --model chatglm3-6b_int8.bmodel # same with int4
+./chatglm --model chatglm3-6b_int8.bmodel # same with int4
 ```
 
 如果是2芯分布式推理，使用如下命令(比如指定在2号和3号芯片上运行, 用`bm-smi`查询芯片id号)：
 ```shell
-./chatglm3 --model chatglm3-6b_f16_2dev.bmodel --devid 2,3
+./chatglm --model chatglm3-6b_f16_2dev.bmodel --devid 2,3
 ```
 
 ## 编译程序(Python版本)
 
 ```shell
-cd chatglm3-tpu/python_demo
+cd ChatGLM3-TPU/python_demo
 mkdir build
 cd build
 cmake ..
@@ -220,7 +223,7 @@ set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 ## 编译程序(Python Web版本)
 
 ```shell
-cd chatglm3-tpu/web_demo
+cd ChatGLM3-TPU/web_demo
 mkdir build
 cd build
 cmake ..
