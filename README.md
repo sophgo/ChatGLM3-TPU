@@ -27,6 +27,7 @@ docker run --privileged --name myname1234 -v $PWD:/workspace -it sophgo/tpuc_dev
 如果是要在SoC环境运行，则需要安装如下库：
 
 ``` shell
+apt-get update
 apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 ```
 
@@ -81,41 +82,7 @@ source ./envsetup.sh
 ./build.sh
 ```
 
-4. 下载[sentencepiece](https://github.com/google/sentencepiece)，并编译得到`sentencepiece.a`
-
-```shell
-git clone git@github.com:google/sentencepiece.git
-cd sentencepiece
-mkdir build
-cd build
-cmake ..
-make -j
-```
-
-如果要编译SoC环境，则需要在`CMakeLists.txt`加入如下代码：
-
-```cmake
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-```
-
-5. 下载libsophon库并安装
-
-在算能官网<https://developer.sophgo.com/site/index/material/all/all.html>可以找到SDK最新版本，如下：
-
-```shell
-wget https://sophon-file.sophon.cn/sophon-prod-s3/drive/23/10/24/21/Release_v2309-LTS.zip
-```
-解压sdk后安装libsophon，如下：
-
-```shell
-apt install sophon-libsophon-dev_0.4.9_amd64.deb
-```
-
-注意如果是SoC环境则安装arm64版本`sophon-libsophon-dev_0.4.9_arm64.deb`
-
-6. 下载本项目`ChatGLM3-TPU`，如下：
+4. 下载本项目`ChatGLM3-TPU`，如下：
 
 ``` shell
 git clone git@github.com:sophgo/ChatGLM3-TPU.git
@@ -159,6 +126,10 @@ python3 export_onnx.py
 
 ## 编译程序(C++版本)
 
+将demo目录拷贝到PCIE或者SoC环境，注意环境中必须有libsophon库。
+如果是SoC环境，将lib目录的`libsentencepiece.a.soc`改名`libsentencepiece.a`。
+执行如下编译：
+
 ```shell
 cd ChatGLM3-TPU/demo
 mkdir build
@@ -167,16 +138,8 @@ cmake ..
 make -j
 ```
 
-如果是SoC环境，则在CMakeLists.txt中加入以下代码，并将SoC版本的`libsentencepiece.a`替换过来：
-
-```cmake
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-```
-
-编译生成chatglm可执行程序，将`chatglm`、`chatglm3-6b.bmodel`和`tokenizer.model`拷贝到运行环境就可以执行了。
-(`tokenizer.model`来自`ChatGLM3-6B`)。
+编译生成chatglm可执行程序，将`chatglm`、`chatglm3-6b.bmodel`和`tokenizer.model`拷贝到同一个目录下就可以执行了。
+(`tokenizer.model`来自[ChatGLM3-6B](https://huggingface.co/THUDM/chatglm3-6b))。
 
 运行`chatglm`，默认单芯运行`chatglm3-6b.bmodel`:
 ```shell
@@ -207,18 +170,13 @@ make -j
 另外这里也直接给出了so文件，可以直接省略上面的编译这一步 (但是必须为python3.7版本)。
 
 若想采用INT8或INT4量化，则需要在编译前将`ChatGLM.cpp`中的`CHATGLM_MODEL`更改为对应的bmodel名称。
+
 ```python
 python run.py
 ```
 即可成功运行python的demo。
 
-如果是SoC环境，则在CMakeLists.txt中加入以下代码，并将SoC版本的`libsentencepiece.a`替换过来：
-
-```cmake
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-```
+如果是SoC环境，参考C++版本
 
 ## 编译程序(Python Web版本)
 
@@ -236,13 +194,7 @@ python web_demo.py
 ```
 即可成功运行web的demo。
 
-如果是SoC环境，则在CMakeLists.txt中加入以下代码，并将SoC版本的`libsentencepiece.a`替换过来：
-
-```cmake
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-```
+如果是SoC环境，参考C++版本
 
 
 ## 运行效果
@@ -251,3 +203,44 @@ set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 
 ![](./assets/chatglm.jpg)
 
+## 常见问题
+
+#### sentencepiece是怎么来的
+
+工程中已经有编译好的，所以不需要编译，如果好奇的话，参考如下步骤。
+
+下载[sentencepiece](https://github.com/google/sentencepiece)，并编译得到`libsentencepiece.a`
+
+```shell
+git clone git@github.com:google/sentencepiece.git
+cd sentencepiece
+mkdir build
+cd build
+cmake ..
+make -j
+```
+
+如果要编译SoC环境，则需要在`CMakeLists.txt`加入如下代码：
+
+```cmake
+set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+```
+
+#### libsophgo库怎么获取
+
+这一步有PCIE环境或者SOC环境的情况下，可以省略。
+
+在算能官网<https://developer.sophgo.com/site/index/material/all/all.html>可以找到SDK最新版本，如下：
+
+```shell
+wget https://sophon-file.sophon.cn/sophon-prod-s3/drive/23/10/24/21/Release_v2309-LTS.zip
+```
+解压sdk后安装libsophon，如下：
+
+```shell
+apt install sophon-libsophon-dev_0.4.9_amd64.deb
+```
+
+注意如果是SoC环境则安装arm64版本`sophon-libsophon-dev_0.4.9_arm64.deb`

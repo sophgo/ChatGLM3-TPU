@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 project(chatglm)
+set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 
 set(LIBSOPHON /opt/sophon/libsophon-current)
 include_directories(${LIBSOPHON}/include)
