@@ -98,7 +98,6 @@ void ChatGLM::init(const std::vector<int> &devices, std::string model) {
     std::cout << d << " ";
   }
   std::cout << "] loading ....\n";
-  int device_num = devices.size();
   for (auto d : devices) {
     bm_handle_t h;
     bm_status_t status = bm_dev_request(&h, d);
@@ -107,7 +106,11 @@ void ChatGLM::init(const std::vector<int> &devices, std::string model) {
   }
   bm_handle = handles[0];
   // create bmruntime
-  p_bmrt = bmrt_create_ex(handles.data(), device_num);
+#ifdef SOC_TARGET
+  p_bmrt = bmrt_create(handles[0]);
+#else
+  p_bmrt = bmrt_create_ex(handles.data(), handles.size());
+#endif
   assert(NULL != p_bmrt);
 
   // load bmodel by file

@@ -126,12 +126,12 @@ cd ChatGLM3-TPU/demo
 mkdir build
 cd build
 cmake ..
-make -j
+make
 ```
 
 如果是SoC版本，有两种编译方法：
 
-方法1：直接将demo目录拷贝到SoC环境，按以上步骤编译
+方法1：直接将demo目录拷贝到SoC环境，按以上步骤编译(推荐)
 
 方法2：docker中交叉编译，如下操作
 
