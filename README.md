@@ -235,3 +235,7 @@ make -j
 
 如果demo程序拷贝到运行环境提示无法运行，比如接口找不到等等错误。
 原因是运行环境的库有所不同，将demo中的`lib_pcie`（PCIE）或者 `lib_soc`(SoC)里面的so文件拷贝到运行环境，链接到里面的so即可。
+
+
+## 工具调用
+参考：[工具调用](./tools_using/README.md)

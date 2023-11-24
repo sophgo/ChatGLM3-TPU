@@ -3,3 +3,13 @@ tmp*
 build/
 libsophon/
 *.model
+
+.cache
+
+__pycache__
+
+*.so
+
+.vscode
+
+pyglm2.py
