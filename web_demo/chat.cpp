@@ -70,6 +70,8 @@ private:
   void move2end(const bm_tensor_t &kv);
   void load_sentencepiece();
   void load_sentencepiece(const std::string &tokenizer_path);
+  std::vector<int> history_tokens;
+  std::vector<int> history_prompt{64790, 64792};
 
 
 private:
@@ -389,46 +391,32 @@ int ChatGLM::forward_next() {
   return token;
 }
 
-// void ChatGLM::chat() {
-//   while (true) {
-//     std::cout << "\nQuestion: ";
-//     std::string input_str;
-//     std::getline(std::cin, input_str);
-//     if (input_str == "exit") {
-//       break;
-//     }
-//     std::cout << "\nAnswer: " << std::flush;
-//     answer(input_str);
-//     std::cout << std::endl;
-//   }
-// }
-
-
-
-
 std::string ChatGLM::predict_first_token(const std::string &input_str) {
-  history += ("[Round " + std::to_string(round + 1) + "]\n\n问：" + input_str +
-              "\n\n答：");
   //int tok_num = 1;
   std::vector<int> tokens;
-  sentencepiece.Encode(history, &tokens);
-  if (tokens.empty()) {
+  std::vector<int> prompt{64795, 30910, 13};
+  sentencepiece.Encode(input_str, &tokens);
+  tokens.insert(tokens.begin(), prompt.begin(), prompt.end());
+  tokens.push_back(64796);
+  history_tokens.insert(history_tokens.end(), tokens.begin(), tokens.end());
+  if (history_tokens.empty()) {
     round = 0;
     history = "Sorry: your question is too wierd!!\n";
     return history;
   }
   // make sure token not too large
-  if (tokens.size() > MAX_LEN - 10) {
+  if (history_tokens.size() > MAX_LEN - 10) {
     // reset
     if (round == 0) {
       history = "Error: your question is too large!\n";
       return history;
     }
     round = 0;
-    history = "";
+    history_tokens.clear();
+    history_tokens.insert(history_tokens.end(), history_prompt.begin(), history_prompt.end());
     return predict_first_token(input_str);
   }
-  int token = forward_first(tokens);
+  int token = forward_first(history_tokens);
   int pre_token = 0;
   std::string pre_word;
   std::string word;
@@ -441,7 +429,7 @@ std::string ChatGLM::predict_first_token(const std::string &input_str) {
   printf("token %d",token);
   printf("diff %s",diff.c_str());
 #endif
-  history += diff;
+  history_tokens.emplace_back(token);
   if (token_length < MAX_LEN) {
     token_length++;
   }
@@ -454,7 +442,8 @@ std::string ChatGLM::predict_next_token() {
   int token = forward_next();
   if(token == EOS){
     round = 0;
-    history = history.substr(history.size()/2);
+    history_tokens.clear();
+    history_tokens.insert(history_tokens.end(), history_prompt.begin(), history_prompt.end());
     return "_GETEOS_";
   }
   std::string pre_word;
@@ -468,7 +457,7 @@ std::string ChatGLM::predict_next_token() {
   printf("token %d",token);
   printf("diff %s",diff.c_str());
 #endif
-  history += diff;
+  history_tokens.emplace_back(token);
   if (token_length < MAX_LEN) {
     token_length++;
   }else{
@@ -477,64 +466,6 @@ std::string ChatGLM::predict_next_token() {
   }
   return diff;
 }
-
-std::string ChatGLM::answer(const std::string &input_str) {
-  history += ("[Round " + std::to_string(round + 1) + "]\n\n问：" + input_str +
-              "\n\n答：");
-  int tok_num = 1;
-  std::vector<int> tokens;
-  sentencepiece.Encode(history, &tokens);
-  if (tokens.empty()) {
-    round = 0;
-    history = "Sorry: your question is too wierd!!\n";
-    return history;
-  }
-  // make sure token not too large
-  if (tokens.size() > MAX_LEN - 10) {
-    // reset
-    if (round == 0) {
-      history = "Error: your question is too large!\n";
-      return history;
-    }
-    round = 0;
-    history = "";
-    answer(input_str);
-    return history;
-  }
-  auto st = std::chrono::system_clock::now();
-  int pre_token = 0;
-  int token = forward_first(tokens);
-  while (token != EOS && token_length < MAX_LEN) {
-    std::string pre_word;
-    std::string word;
-    std::vector<int> pre_ids = {pre_token};
-    std::vector<int> ids = {pre_token, token};
-    sentencepiece.Decode(pre_ids, &pre_word);
-    sentencepiece.Decode(ids, &word);
-    std::string diff = word.substr(pre_word.size());
-    history += diff;
-    std::cout << diff << std::flush;
-    if (token_length < MAX_LEN) {
-      token_length++;
-    }
-    tok_num++;
-    token = forward_next();
-  }
-  auto et = std::chrono::system_clock::now();
-  auto duration =
-      std::chrono::duration_cast<std::chrono::microseconds>(et - st);
-  printf("\nspeed: %f token/s\n", tok_num / (duration.count() * 1e-6));
-  if (token_length >= MAX_LEN) {
-    round = 0;
-    history = history.substr(history.size()/2);
-  } else {
-    history += "\n\n";
-    round++;
-  }
-  return history;
-}
-
-
 
 
 extern "C" {

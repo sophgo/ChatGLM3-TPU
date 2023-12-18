@@ -74,6 +74,8 @@ private:
   std::string name_blocks[NUM_LAYERS];
   std::string name_blocks_cache[NUM_LAYERS];
   std::string history = "";
+  std::vector<int> history_tokens;
+  std::vector<int> history_prompt{64790, 64792};
   int round = 0;
   int token_length;
   int EOS;
@@ -320,39 +322,45 @@ void ChatGLM::chat() {
       break;
     }
     std::cout << "\nAnswer: " << std::flush;
+    
     answer(input_str);
+
     std::cout << std::endl;
   }
 }
 
 void ChatGLM::answer(const std::string &input_str) {
   // auto time_0 = std::chrono::system_clock::now();
-  history += ("[Round " + std::to_string(round + 1) + "]\n\n问：" + input_str +
-              "\n\n答：");
   int tok_num = 0;
   std::vector<int> tokens;
-  sentencepiece.Encode(history, &tokens);
-  if (tokens.empty()) {
+  std::vector<int> prompt{64795, 30910, 13};
+  sentencepiece.Encode(input_str, &tokens);
+  tokens.insert(tokens.begin(), prompt.begin(), prompt.end());
+  tokens.push_back(64796);
+  history_tokens.insert(history_tokens.end(), tokens.begin(), tokens.end());
+  if (history_tokens.empty()) {
     printf("Sorry: your question is too wierd!!\n");
     history = "";
     round = 0;
     return;
   }
   // make sure token not too large
-  if (tokens.size() > MAX_LEN - 10) {
+  if (history_tokens.size() > MAX_LEN - 10) {
     // reset
     if (round == 0) {
       printf("Error: your question is too large!\n");
       return;
     }
     round = 0;
-    history = "";
+    // history = "";
+    history_tokens.clear();
+    history_tokens.insert(history_tokens.end(), history_prompt.begin(), history_prompt.end());
     answer(input_str);
     return;
   }
   auto time_1 = std::chrono::system_clock::now();
   int pre_token = 0;
-  int token = forward_first(tokens);
+  int token = forward_first(history_tokens);
   auto time_2 = std::chrono::system_clock::now();
   while (token != EOS && token_length < MAX_LEN) {
     std::string pre_word;
@@ -362,7 +370,8 @@ void ChatGLM::answer(const std::string &input_str) {
     sentencepiece.Decode(pre_ids, &pre_word);
     sentencepiece.Decode(ids, &word);
     std::string diff = word.substr(pre_word.size());
-    history += diff;
+    // history += diff;
+    history_tokens.emplace_back(token);
     std::cout << diff << std::flush;
     if (token_length < MAX_LEN) {
       token_length++;
@@ -382,7 +391,8 @@ void ChatGLM::answer(const std::string &input_str) {
   printf("\nFTL:%f s, TPS: %f tokens/s\n", ftl_dur.count() * 1e-6, tps);
   if (token_length >= MAX_LEN) {
     round = 0;
-    history = history.substr(history.size() / 2);
+    history_tokens.clear();
+    history_tokens.insert(history_tokens.end(), history_prompt.begin(), history_prompt.end());
   } else {
     history += "\n\n";
     round++;

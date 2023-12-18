@@ -190,6 +190,7 @@ python run.py
 ## 编译程序(Python Web版本)
 
 ```shell
+pip install gradio==3.39.0
 cd ChatGLM3-TPU/web_demo
 mkdir build
 cd build
@@ -204,6 +205,8 @@ python web_demo.py
 即可成功运行web的demo。
 
 如果是SoC环境，参考C++版本
+
+PS：尽量下载gradio==3.39.0版本，不然会出现各种问题！！
 
 
 ## 运行效果
