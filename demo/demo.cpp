@@ -322,9 +322,7 @@ void ChatGLM::chat() {
       break;
     }
     std::cout << "\nAnswer: " << std::flush;
-    
     answer(input_str);
-
     std::cout << std::endl;
   }
 }
