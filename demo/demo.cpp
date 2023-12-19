@@ -55,6 +55,7 @@ private:
   int forward_next();
   void move2end(const bm_tensor_t &kv);
   void load_sentencepiece();
+  void build_system_prompt();
 
 private:
   std::vector<bm_handle_t> handles;
@@ -73,9 +74,10 @@ private:
   std::string name_lm;
   std::string name_blocks[NUM_LAYERS];
   std::string name_blocks_cache[NUM_LAYERS];
-  std::string history = "";
+  std::string system_string = "You are ChatGLM3, a large language model trained by Zhipu.AI. Follow the user's instructions carefully. Respond using markdown.";
   std::vector<int> history_tokens;
-  std::vector<int> history_prompt{64790, 64792};
+  std::vector<int> head_prompt{64790, 64792, 64794, 30910, 13}; // head + system id + \n
+  std::vector<int> system_prompt;
   int round = 0;
   int token_length;
   int EOS;
@@ -107,6 +109,10 @@ void ChatGLM::init(const std::vector<int> &devices, std::string model) {
     handles.push_back(h);
   }
   bm_handle = handles[0];
+
+  // decode system prompt
+  sentencepiece.Encode(system_string, &system_prompt);
+
   // create bmruntime
 #ifdef SOC_TARGET
   p_bmrt = bmrt_create(handles[0]);
@@ -313,6 +319,12 @@ int ChatGLM::forward_next() {
   return token;
 }
 
+void ChatGLM::build_system_prompt() {
+  history_tokens.clear();
+  history_tokens.insert(history_tokens.end(), head_prompt.begin(), head_prompt.end());
+  history_tokens.insert(history_tokens.end(), system_prompt.begin(), system_prompt.end());
+}
+
 void ChatGLM::chat() {
   while (true) {
     std::cout << "\nQuestion: ";
@@ -335,24 +347,26 @@ void ChatGLM::answer(const std::string &input_str) {
   sentencepiece.Encode(input_str, &tokens);
   tokens.insert(tokens.begin(), prompt.begin(), prompt.end());
   tokens.push_back(64796);
+  if (history_tokens.size() == 0) {
+    build_system_prompt();
+  }
   history_tokens.insert(history_tokens.end(), tokens.begin(), tokens.end());
+
   if (history_tokens.empty()) {
     printf("Sorry: your question is too wierd!!\n");
-    history = "";
     round = 0;
+    history_tokens.clear();
     return;
   }
   // make sure token not too large
   if (history_tokens.size() > MAX_LEN - 10) {
     // reset
+    history_tokens.clear();
     if (round == 0) {
       printf("Error: your question is too large!\n");
       return;
     }
     round = 0;
-    // history = "";
-    history_tokens.clear();
-    history_tokens.insert(history_tokens.end(), history_prompt.begin(), history_prompt.end());
     answer(input_str);
     return;
   }
@@ -368,7 +382,6 @@ void ChatGLM::answer(const std::string &input_str) {
     sentencepiece.Decode(pre_ids, &pre_word);
     sentencepiece.Decode(ids, &word);
     std::string diff = word.substr(pre_word.size());
-    // history += diff;
     history_tokens.emplace_back(token);
     std::cout << diff << std::flush;
     if (token_length < MAX_LEN) {
@@ -388,11 +401,9 @@ void ChatGLM::answer(const std::string &input_str) {
   // double tht = tokens.size() / (tht_dur.count() * 1e-6);
   printf("\nFTL:%f s, TPS: %f tokens/s\n", ftl_dur.count() * 1e-6, tps);
   if (token_length >= MAX_LEN) {
-    round = 0;
     history_tokens.clear();
-    history_tokens.insert(history_tokens.end(), history_prompt.begin(), history_prompt.end());
+    round = 0;
   } else {
-    history += "\n\n";
     round++;
   }
 }

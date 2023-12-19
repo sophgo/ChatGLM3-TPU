@@ -62,6 +62,7 @@ public:
   int EOS;
   std::string predict_next_token();
   std::string predict_first_token(const std::string &input_str);
+  void build_system_prompt();
 
 private:
   void tokenizer_encode(const std::string &input_str, std::vector<int> &tokens);
@@ -70,8 +71,10 @@ private:
   void move2end(const bm_tensor_t &kv);
   void load_sentencepiece();
   void load_sentencepiece(const std::string &tokenizer_path);
+  std::string system_string = "You are ChatGLM3, a large language model trained by Zhipu.AI. Follow the user's instructions carefully. Respond using markdown.";
   std::vector<int> history_tokens;
-  std::vector<int> history_prompt{64790, 64792};
+  std::vector<int> head_prompt{64790, 64792, 64794, 30910, 13}; // head + system id + \n
+  std::vector<int> system_prompt;
 
 
 private:
@@ -118,6 +121,9 @@ void ChatGLM::init(int devid, const std::string bmodel_path, const std::string t
   load_sentencepiece(tokenizer_path);
   bm_status_t status = bm_dev_request(&bm_handle, devid);
   assert(BM_SUCCESS == status);
+
+  // decode system prompt
+  sentencepiece.Encode(system_string, &system_prompt);
 
   // create bmruntime
   p_bmrt = bmrt_create(bm_handle);
@@ -391,6 +397,12 @@ int ChatGLM::forward_next() {
   return token;
 }
 
+void ChatGLM::build_system_prompt() {
+  history_tokens.clear();
+  history_tokens.insert(history_tokens.end(), head_prompt.begin(), head_prompt.end());
+  history_tokens.insert(history_tokens.end(), system_prompt.begin(), system_prompt.end());
+}
+
 std::string ChatGLM::predict_first_token(const std::string &input_str) {
   //int tok_num = 1;
   std::vector<int> tokens;
@@ -398,22 +410,22 @@ std::string ChatGLM::predict_first_token(const std::string &input_str) {
   sentencepiece.Encode(input_str, &tokens);
   tokens.insert(tokens.begin(), prompt.begin(), prompt.end());
   tokens.push_back(64796);
+  if (history_tokens.size() == 0) {
+    build_system_prompt();
+  }
   history_tokens.insert(history_tokens.end(), tokens.begin(), tokens.end());
+
   if (history_tokens.empty()) {
     round = 0;
     history = "Sorry: your question is too wierd!!\n";
+    history_tokens.clear();
     return history;
   }
   // make sure token not too large
   if (history_tokens.size() > MAX_LEN - 10) {
     // reset
-    if (round == 0) {
-      history = "Error: your question is too large!\n";
-      return history;
-    }
-    round = 0;
     history_tokens.clear();
-    history_tokens.insert(history_tokens.end(), history_prompt.begin(), history_prompt.end());
+    round = 0;
     return predict_first_token(input_str);
   }
   int token = forward_first(history_tokens);
@@ -442,8 +454,6 @@ std::string ChatGLM::predict_next_token() {
   int token = forward_next();
   if(token == EOS){
     round = 0;
-    history_tokens.clear();
-    history_tokens.insert(history_tokens.end(), history_prompt.begin(), history_prompt.end());
     return "_GETEOS_";
   }
   std::string pre_word;
@@ -462,6 +472,7 @@ std::string ChatGLM::predict_next_token() {
     token_length++;
   }else{
     round = 0;
+    history_tokens.clear();
     return "_GETMAX_";
   }
   return diff;
