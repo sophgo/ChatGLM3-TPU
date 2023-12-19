@@ -22,7 +22,7 @@ static const int NUM_LAYERS = 28;
 static const int MAX_LEN = 512;
 static const int HIDDEN_SIZE = 4096;
 
-static const std::string TOKENIZER_MODEL = "tokenizer.model";
+static const std::string TOKENIZER_MODEL = "../src/tokenizer.model";
 
 // #define EXPORT_RESULTS
 #ifdef EXPORT_RESULTS

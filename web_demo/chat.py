@@ -1,7 +1,11 @@
 # coding=utf-8
 
 import ctypes
+import os
 
+def check_file_exists(file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
 
 class TokenWord(ctypes.Structure):
     _fields_ = [
@@ -9,13 +13,18 @@ class TokenWord(ctypes.Structure):
         ("word", ctypes.c_char * 2048)  # 假设最大长度为 100，你可以根据实际情况调整
     ]
 
-
 class TPUChatglm:
-    def __init__(self):
-        self.lib = ctypes.cdll.LoadLibrary('./build/libtpuchat.so')
-        device_id = 17
-        bmodel_path = "../../deploy/chatglm3-6b.bmodel"
-        token_path = "../../deploy/tokenizer.model"
+    def __init__(self, 
+                device_id = 0,
+                bmodel_path = "../compile/chatglm3-6b.bmodel",
+                token_path = "../src/tokenizer.model",
+                lib_path = "./build/libtpuchat.so"):
+
+        check_file_exists(bmodel_path)
+        check_file_exists(token_path)
+        check_file_exists(lib_path) 
+
+        self.lib = ctypes.cdll.LoadLibrary(lib_path)
         self.device_id = device_id
         self.bmodel_path = bmodel_path
         self.token_path = token_path
@@ -94,16 +103,3 @@ class TPUChatglm:
 
     def get_config(self):
         pass
-
-
-if __name__ == "__main__":
-    # chatglm = TPUChatglm()
-    # for i in range(200):
-    #     print(i)
-    #     r = chatglm.predict("写一首关于春天的七言绝句。")
-    #     print(r)
-
-    # import pdb
-    # pdb.set_trace()
-    pass
-

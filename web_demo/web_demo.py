@@ -2,7 +2,20 @@ import time
 import gradio as gr
 import mdtex2html
 from chat import TPUChatglm
+import argparse
 
+parser = argparse.ArgumentParser(description='Your script description here.')
+parser.add_argument('--dev', type=int, default=0, help='Device ID to use.')
+parser.add_argument('--bmodel_path', type=str, default="../compile/chatglm3-6b.bmodel", help='Path to the bmodel file.')
+parser.add_argument('--token_path', type=str, default="../src/tokenizer.model", help='ath to the tokenizer file.')
+parser.add_argument('--lib_path', type=str, default="./build/libtpuchat.so", help='Path to the lib file.')
+
+args = parser.parse_args()
+
+glm = TPUChatglm(device_id = args.dev,
+                 bmodel_path = args.bmodel_path,
+                 token_path = args.token_path,
+                 lib_path = args.lib_path)
 
 def postprocess(self, y):
     if y is None:
@@ -13,11 +26,6 @@ def postprocess(self, y):
             None if response is None else mdtex2html.convert(response),
         )
     return y
-
-
-gr.Chatbot.postprocess = postprocess
-
-glm = TPUChatglm()
 
 def parse_text(text):
     """copy from https://github.com/GaiZhenbiao/ChuanhuChatGPT/"""
@@ -79,6 +87,7 @@ def reset_user_input():
 def reset_state():
     return [], [], None
 
+gr.Chatbot.postprocess = postprocess
 
 with gr.Blocks() as demo:
     gr.HTML("""<h1 align="center">ChatGLM-6B TPU</h1>""")

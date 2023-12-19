@@ -147,9 +147,7 @@ make -j
 
 ```
 
-编译生成chatglm可执行程序，将`chatglm`、`chatglm3-6b.bmodel`和`tokenizer.model`拷贝到同一个目录下就可以执行了。
-(`tokenizer.model`来自[ChatGLM3-6B](https://huggingface.co/THUDM/chatglm3-6b))。
-
+编译生成chatglm可执行程序，将`chatglm`放到/ChatGLM3-TPU/demo目录下，同时按照下列方式指定芯片数量和bmodel路径。
 运行`chatglm`，默认单芯运行`chatglm3-6b.bmodel`:
 ```shell
 ./chatglm --model chatglm3-6b.bmodel
@@ -160,32 +158,10 @@ make -j
 ./chatglm --model chatglm3-6b_int8.bmodel # same with int4
 ```
 
-如果是2芯分布式推理，使用如下命令(比如指定在2号和3号芯片上运行, 用`bm-smi`查询芯片id号)：
+如果是2芯分布式推理，使用如下命令(比如指定在2号和3号芯片上运行, 用`source /etc/profiel`后使用`bm-smi`查询芯片id号)：
 ```shell
 ./chatglm --model chatglm3-6b_f16_2dev.bmodel --devid 2,3
 ```
-
-## 编译程序(Python版本)
-
-```shell
-cd ChatGLM3-TPU/python_demo
-mkdir build
-cd build
-cmake ..
-make -j
-```
-
-编译成功会生成`ChatGLM.cpython-37m-x86_64-linux-gnu.so`，之后将`chatglm3-6b.bmodel`放到python\_demo目录下。
-另外这里也直接给出了so文件，可以直接省略上面的编译这一步 (但是必须为python3.7版本)。
-
-若想采用INT8或INT4量化，则需要在编译前将`ChatGLM.cpp`中的`CHATGLM_MODEL`更改为对应的bmodel名称。
-
-```python
-python run.py
-```
-即可成功运行python的demo。
-
-如果是SoC环境，参考C++版本
 
 ## 编译程序(Python Web版本)
 
@@ -198,16 +174,15 @@ cmake ..
 make -j
 ```
 
-编译成功会生成`libtpuchat.so*`，在chat.py中指定bmodel\_path token\_path device\_id。
+编译成功会生成`libtpuchat.so*`, 在web_demo.py中指定bmodel\_path token\_path device\_id, lib_path(编译生产的.so文件), 以及dev_id。
 ```python
-python web_demo.py
+python web_demo.py --dev 0 --bmodel_path your_bmodel_path
 ```
 即可成功运行web的demo。
 
 如果是SoC环境，参考C++版本
 
 PS：尽量下载gradio==3.39.0版本，不然会出现各种问题！！
-
 
 ## 运行效果
 
