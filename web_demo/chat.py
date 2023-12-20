@@ -84,13 +84,8 @@ class TPUChatglm:
     def stream_predict(self, query, history):
         history.append((query, ''))
 
-        prompt = ''
-        for i, (old_query, response) in enumerate(history):
-            prompt += "[Round {}]\n\n问：{}\n\n答：{}\n\n".format(i + 1, old_query, response)
-        prompt += "[Round {}]\n\n问：{}\n\n答：".format(len(history) + 1, query)
-
         res = ''
-        first_token = self.predict_first_token(prompt)
+        first_token = self.predict_first_token(query)
         res += first_token
 
         while True:

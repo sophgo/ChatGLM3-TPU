@@ -20,7 +20,7 @@ elseif (${TARGET_ARCH} STREQUAL "soc")
     set(CMAKE_C_COMPILER /opt/aarch64-linux-gnu-7.5.0/bin/aarch64-linux-gnu-gcc)
     set(CMAKE_ASM_COMPILER /opt/aarch64-linux-gnu-7.5.0/bin/aarch64-linux-gnu-gcc)
     set(CMAKE_CXX_COMPILER /opt/aarch64-linux-gnu-7.5.0/bin/aarch64-linux-gnu-g++)
-    link_directories(${PROJECT_SOURCE_DIR}/lib_soc)
+    link_directories(${PROJECT_SOURCE_DIR}/../src/lib_soc)
 	message("SoC mode, starting......")
 endif()
 
