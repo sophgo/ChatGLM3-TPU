@@ -18,11 +18,7 @@
 #include "bmruntime_interface.h"
 #include <getopt.h>
 
-static const int NUM_LAYERS = 28;
-static const int MAX_LEN = 512;
-static const int HIDDEN_SIZE = 4096;
-
-static const std::string TOKENIZER_MODEL = "../src/tokenizer.model";
+static const std::string TOKENIZER_MODEL = "tokenizer.model";
 
 // #define EXPORT_RESULTS
 #ifdef EXPORT_RESULTS
@@ -62,25 +58,31 @@ private:
   bm_handle_t bm_handle;
   void *p_bmrt;
   sentencepiece::SentencePieceProcessor sentencepiece;
-  const bm_net_info_t *net_blocks[NUM_LAYERS];
-  const bm_net_info_t *net_blocks_cache[NUM_LAYERS];
+  std::vector<const bm_net_info_t *> net_blocks;
+  std::vector<const bm_net_info_t *> net_blocks_cache;
   const bm_net_info_t *net_embed;
   const bm_net_info_t *net_lm;
   bm_tensor_t inputs_embed_512, outputs_embed_512;
   bm_tensor_t inputs_lm, outputs_lm;
   bm_tensor_t inputs_pid, next_pid, inputs_attention, next_attention;
-  bm_tensor_t past_key[NUM_LAYERS], past_value[NUM_LAYERS];
+  std::vector<bm_tensor_t> past_key;
+  std::vector<bm_tensor_t> past_value;
   std::string name_embed;
   std::string name_lm;
-  std::string name_blocks[NUM_LAYERS];
-  std::string name_blocks_cache[NUM_LAYERS];
-  std::string system_string = "You are ChatGLM3, a large language model trained by Zhipu.AI. Follow the user's instructions carefully. Respond using markdown.";
+  std::vector<std::string> name_blocks;
+  std::vector<std::string> name_blocks_cache;
+  std::string system_string =
+      "You are ChatGLM3, a large language model trained by Zhipu.AI. Follow "
+      "the user's instructions carefully. Respond using markdown.";
   std::vector<int> history_tokens;
-  std::vector<int> head_prompt{64790, 64792, 64794, 30910, 13}; // head + system id + \n
+  std::vector<int> head_prompt{64790, 64792, 64794, 30910,
+                               13}; // head + system id + \n
   std::vector<int> system_prompt;
   int round = 0;
   int token_length;
   int EOS;
+  int SEQLEN;
+  int NUM_LAYERS;
 };
 
 void ChatGLM::load_sentencepiece() {
@@ -129,18 +131,20 @@ void ChatGLM::init(const std::vector<int> &devices, std::string model) {
   // net names
   name_embed = "embedding";
   name_lm = "lm_head";
-  for (int i = 0; i < NUM_LAYERS; i++) {
-    name_blocks[i] = "glm_block_" + std::to_string(i);
-    name_blocks_cache[i] = "glm_block_cache_" + std::to_string(i);
-  }
-
-  // net infos
   net_embed = bmrt_get_network_info(p_bmrt, name_embed.c_str());
   net_lm = bmrt_get_network_info(p_bmrt, name_lm.c_str());
+  SEQLEN = net_embed->stages[1].input_shapes[0].dims[0]; // real seqlen
+  auto num_nets = bmrt_get_network_number(p_bmrt);
+  NUM_LAYERS = (num_nets - 2) / 2;
   for (int i = 0; i < NUM_LAYERS; i++) {
-    net_blocks[i] = bmrt_get_network_info(p_bmrt, name_blocks[i].c_str());
-    net_blocks_cache[i] =
-        bmrt_get_network_info(p_bmrt, name_blocks_cache[i].c_str());
+    auto block_name = "glm_block_" + std::to_string(i);
+    auto cache_name = "glm_block_cache_" + std::to_string(i);
+    name_blocks.emplace_back(block_name);
+    name_blocks_cache.emplace_back(cache_name);
+    auto block_info = bmrt_get_network_info(p_bmrt, block_name.c_str());
+    auto cache_info = bmrt_get_network_info(p_bmrt, cache_name.c_str());
+    net_blocks.emplace_back(block_info);
+    net_blocks_cache.emplace_back(cache_info);
   }
 
   // net device mem
@@ -169,6 +173,8 @@ void ChatGLM::init(const std::vector<int> &devices, std::string model) {
                   net_blocks_cache[0]->stages[0].input_shapes[2]);
   assert(true == ret);
 
+  past_key.resize(NUM_LAYERS);
+  past_value.resize(NUM_LAYERS);
   for (int i = 0; i < NUM_LAYERS; i++) {
     ret = bmrt_tensor(&past_key[i], p_bmrt, net_blocks[0]->output_dtypes[1],
                       net_blocks[0]->stages[0].output_shapes[1]);
@@ -206,11 +212,11 @@ void ChatGLM::deinit() {
 
 // after first block, move real result to end of mem
 void ChatGLM::move2end(const bm_tensor_t &kv) {
-  if (token_length >= MAX_LEN) {
+  if (token_length >= SEQLEN) {
     return;
   }
   auto total_size = bm_mem_get_device_size(kv.device_mem);
-  auto bytes = total_size / MAX_LEN;
+  auto bytes = total_size / SEQLEN;
   auto real_size = token_length * bytes;
   auto mem =
       bm_mem_from_device(bm_mem_get_device_addr(kv.device_mem), real_size);
@@ -225,9 +231,9 @@ void ChatGLM::move2end(const bm_tensor_t &kv) {
 }
 
 int ChatGLM::forward_first(std::vector<int> &tokens) {
-  std::vector<int> input_ids(MAX_LEN, 0);
-  std::vector<int> position_id(MAX_LEN, 0);
-  std::vector<float> attention_mask(MAX_LEN * MAX_LEN, 0);
+  std::vector<int> input_ids(SEQLEN, 0);
+  std::vector<int> position_id(SEQLEN, 0);
+  std::vector<float> attention_mask(SEQLEN * SEQLEN, 0);
 
   input_ids[0] = 64790;
   input_ids[1] = 64792;
@@ -237,11 +243,11 @@ int ChatGLM::forward_first(std::vector<int> &tokens) {
   for (int i = 0; i < token_length; i++) {
     position_id[i] = i;
   }
-  for (int i = 0; i < MAX_LEN; i++) {
-    for (int j = 0; j < MAX_LEN; j++) {
+  for (int i = 0; i < SEQLEN; i++) {
+    for (int j = 0; j < SEQLEN; j++) {
       if (j <= i && i < token_length) {
       } else {
-        attention_mask[i * MAX_LEN + j] = 1.0;
+        attention_mask[i * SEQLEN + j] = 1.0;
       }
     }
   }
@@ -271,7 +277,7 @@ int ChatGLM::forward_first(std::vector<int> &tokens) {
     move2end(past_key[i]);
     move2end(past_value[i]);
   }
-  int bytes = inputs_embed.device_mem.size / MAX_LEN;
+  int bytes = inputs_embed.device_mem.size / SEQLEN;
   bm_memcpy_d2d_byte(bm_handle, inputs_lm.device_mem, 0,
                      inputs_embed.device_mem, (token_length - 1) * bytes,
                      bytes);
@@ -284,8 +290,8 @@ int ChatGLM::forward_first(std::vector<int> &tokens) {
 }
 
 int ChatGLM::forward_next() {
-  std::vector<float> attention_mask(MAX_LEN + 1, 0);
-  for (int i = 0; i <= MAX_LEN - token_length; i++) {
+  std::vector<float> attention_mask(SEQLEN + 1, 0);
+  for (int i = 0; i <= SEQLEN - token_length; i++) {
     attention_mask[i] = 1.0;
   }
   int32_t position_id = token_length - 1;
@@ -321,8 +327,10 @@ int ChatGLM::forward_next() {
 
 void ChatGLM::build_system_prompt() {
   history_tokens.clear();
-  history_tokens.insert(history_tokens.end(), head_prompt.begin(), head_prompt.end());
-  history_tokens.insert(history_tokens.end(), system_prompt.begin(), system_prompt.end());
+  history_tokens.insert(history_tokens.end(), head_prompt.begin(),
+                        head_prompt.end());
+  history_tokens.insert(history_tokens.end(), system_prompt.begin(),
+                        system_prompt.end());
 }
 
 void ChatGLM::chat() {
@@ -359,7 +367,7 @@ void ChatGLM::answer(const std::string &input_str) {
     return;
   }
   // make sure token not too large
-  if (history_tokens.size() > MAX_LEN - 10) {
+  if ((int)history_tokens.size() > SEQLEN - 10) {
     // reset
     history_tokens.clear();
     if (round == 0) {
@@ -374,7 +382,7 @@ void ChatGLM::answer(const std::string &input_str) {
   int pre_token = 0;
   int token = forward_first(history_tokens);
   auto time_2 = std::chrono::system_clock::now();
-  while (token != EOS && token_length < MAX_LEN) {
+  while (token != EOS && token_length < SEQLEN) {
     std::string pre_word;
     std::string word;
     std::vector<int> pre_ids = {pre_token};
@@ -384,7 +392,7 @@ void ChatGLM::answer(const std::string &input_str) {
     std::string diff = word.substr(pre_word.size());
     history_tokens.emplace_back(token);
     std::cout << diff << std::flush;
-    if (token_length < MAX_LEN) {
+    if (token_length < SEQLEN) {
       token_length++;
     }
     tok_num++;
@@ -400,7 +408,7 @@ void ChatGLM::answer(const std::string &input_str) {
   double tps = tok_num / (tps_dur.count() * 1e-6);
   // double tht = tokens.size() / (tht_dur.count() * 1e-6);
   printf("\nFTL:%f s, TPS: %f tokens/s\n", ftl_dur.count() * 1e-6, tps);
-  if (token_length >= MAX_LEN) {
+  if (token_length >= SEQLEN) {
     history_tokens.clear();
     round = 0;
   } else {
