@@ -18,7 +18,7 @@
 #include "bmruntime_interface.h"
 #include <getopt.h>
 
-static const std::string TOKENIZER_MODEL = "tokenizer.model";
+static const std::string TOKENIZER_MODEL = "../src/tokenizer.model";
 
 // #define EXPORT_RESULTS
 #ifdef EXPORT_RESULTS
